@@ -1,0 +1,26 @@
+code_name: 'MDI_ANI_Driver'
+docker:
+  image_name: 'mdi-ani-driver'
+  build_image:
+    - pip install pymdi
+    - pip install jupyter
+    - pip install numpy
+    - pip install torch
+    - pip install torchani
+  
+  build_engine:
+   - "echo 'Engine built'"
+
+run_scripts:
+  ani:
+    containers:
+      ani:
+        image: 'mdi-ani-driver:dev'
+        script:
+          - python driver.py -mdi "-role DRIVER -name driver -method TCP -port 8021"
+      lammps:
+        image: 'janash/mdi-lammps:slim'
+        script:
+          - umask 0000
+          - cd lammps
+          - lmp_mpi -mdi "-role ENGINE -name MD -method TCP -port 8021 -hostname ani" -in lammps.in > lammps.out

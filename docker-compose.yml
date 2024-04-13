@@ -1,0 +1,27 @@
+version: '3'
+
+services:
+  ani:
+    image: "mdi-ani-driver:dev"
+    command: bash -l -c "bash -l /mdi_shared/.mdimechanic/.temp/docker_mdi_0.sh"
+    volumes:
+      - '/home/janash/projects/mdi-tutorials/mdi-ani:/mdi_shared'
+      - '/home/janash/miniconda3/envs/mdi-docs/lib/python3.11/site-packages:/MDI_Mechanic'
+    networks:
+      mdinet:
+        aliases:
+          - ani
+  lammps:
+    image: "janash/mdi-lammps:slim"
+    command: bash -l -c "bash -l /mdi_shared/.mdimechanic/.temp/docker_mdi_1.sh"
+    volumes:
+      - '/home/janash/projects/mdi-tutorials/mdi-ani:/mdi_shared'
+      - '/home/janash/miniconda3/envs/mdi-docs/lib/python3.11/site-packages:/MDI_Mechanic'
+    networks:
+      mdinet:
+        aliases:
+          - lammps
+
+networks:
+  mdinet:
+    driver: "bridge"
