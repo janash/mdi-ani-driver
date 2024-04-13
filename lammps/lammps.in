@@ -8,7 +8,7 @@ pair_modify     mix arithmetic
 kspace_style    pppm 1e-4
 special_bonds   amber
 
-variable        temp equal 500.0
+variable        temp equal 0
 variable        seed equal 12345
 
 atom_modify	sort 0 0
