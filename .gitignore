@@ -189,3 +189,7 @@ docker/.temp
 
 # Source directory
 /source
+
+# Simulation files
+dump.*
+log.lammps
