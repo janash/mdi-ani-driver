@@ -100,7 +100,7 @@ if __name__ == "__main__":
     pbc = torch.tensor([True, True, True], device=device)
     
     # Set the number of timesteps for our simulation
-    nsteps = 10000
+    nsteps = 10
 
     # iterate
     for i in range(nsteps):
@@ -111,6 +111,10 @@ if __name__ == "__main__":
         coords = np.empty(3*natoms, dtype=float)
         mdi.MDI_Send_Command("<COORDS", comm)
         mdi.MDI_Recv(3*natoms, mdi.MDI_DOUBLE, comm, buf=coords)
+
+        # Get the energy from LAMMPS
+        mdi.MDI_Send_Command("<ENERGY", comm)
+        lammps_energy = mdi.MDI_Recv(1, mdi.MDI_DOUBLE, comm)
 
         # ani wants a torch tensor with shape (natoms, 3)
         coords_reshape = coords.reshape(natoms, 3)
@@ -125,6 +129,8 @@ if __name__ == "__main__":
         energy = model((elements_torch, coords_torch), cell=cell, pbc=pbc).energies
         derivative = torch.autograd.grad(energy, coords_torch)[0]
         forces = -derivative.squeeze()
+
+        print(f"timestep: {i} {lammps_energy} {energy.item()}")
         
         # get the forces as a numpy array
         forces_np = forces.cpu().detach().numpy()
@@ -135,7 +141,6 @@ if __name__ == "__main__":
         # Send the forces to the engine
         mdi.MDI_Send_Command(">FORCES", comm)
         mdi.MDI_Send(forces_np, natoms*3, mdi.MDI_DOUBLE, comm)
-        
-    
+
     # Send the "EXIT" command to each of the engines
     mdi.MDI_Send_Command("EXIT", comm)
