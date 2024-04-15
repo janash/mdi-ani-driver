@@ -7,20 +7,36 @@ docker:
     - pip install numpy
     - pip install torch
     - pip install torchani
+    - pip install matplotlib
   
   build_engine:
    - "echo 'Engine built'"
 
 run_scripts:
-  ani:
+  ani-md:
     containers:
       ani:
         image: 'mdi-ani-driver:dev'
         script:
-          - python driver.py -mdi "-role DRIVER -name driver -method TCP -port 8021"
+          - python driver.py -mdi "-role DRIVER -name driver -method TCP -port 8021" -nsteps 100
       lammps:
         image: 'janash/mdi-lammps:slim'
         script:
           - umask 0000
           - cd lammps
           - lmp_mpi -mdi "-role ENGINE -name MD -method TCP -port 8021 -hostname ani" -in lammps.in > lammps.out
+  ani-min:
+    containers:
+      ani:
+        image: 'mdi-ani-driver:dev'
+        script:
+          - python driver.py -mdi "-role DRIVER -name driver -method TCP -port 8021" -nsteps 25 --minimization
+      lammps:
+        image: 'janash/mdi-lammps:slim'
+        script:
+          - umask 0000
+          - cd lammps
+          - lmp_mpi -mdi "-role ENGINE -name MD -method TCP -port 8021 -hostname ani" -in min.in > min.out
+      
+
+      

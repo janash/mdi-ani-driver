@@ -191,5 +191,7 @@ docker/.temp
 /source
 
 # Simulation files
-dump.*
+*.force
+*.lammpstrj
+*.xyz
 log.lammps

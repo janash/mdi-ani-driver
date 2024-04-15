@@ -1,6 +1,7 @@
 import sys
 
 import numpy as np
+import matplotlib.pyplot as plt
 import torch
 import torchani
 
@@ -26,12 +27,19 @@ if __name__ == "__main__":
     # Read the command-line options
     iarg = 1
     mdi_options = None
+    nsteps = 10
+    node = "@INIT_MD"
     while iarg < len(sys.argv):
         arg = sys.argv[iarg]
 
         if arg == "-mdi":
             mdi_options = sys.argv[iarg + 1]
             iarg += 1
+        elif arg == "-nsteps":
+            nsteps = int(sys.argv[iarg + 1])
+            iarg += 1
+        elif arg == "--minimization":
+            node = "@INIT_OPTG"
         else:
             raise Exception("Unrecognized command-line option")
 
@@ -49,6 +57,12 @@ if __name__ == "__main__":
 
     # Connect to the engines
     comm = mdi.MDI_Accept_Communicator()
+
+    # Print the simulation type:
+    if node == "@INIT_MD":
+        print("Performing MD simulation")
+    elif node == "@INIT_OPTG":
+        print("Performing geometry optimization (minimization)")
 
     # Get the name of the engine
     mdi.MDI_Send_Command("<NAME", comm)
@@ -79,7 +93,7 @@ if __name__ == "__main__":
     # We know we only have hydrogen and oxygen, so
     # we'll do a simple mapping for now.
     element_map = {15.9994: 8, 1.008: 1}
-    elements = np.array([element_map[mass] for mass in masses])
+    elements = np.array([[element_map[mass] for mass in masses]])
     
 
     # Get the box vectors
@@ -88,21 +102,19 @@ if __name__ == "__main__":
     mdi.MDI_Recv(9, mdi.MDI_DOUBLE, comm, buf=box_vects)
     print(box_vects)
 
-    # Start an MD simulation
-    mdi.MDI_Send_Command("@INIT_MD", comm) # Send MDI to INIT_MD node
+    # Start appropriate type of simulaton
+    mdi.MDI_Send_Command(node, comm) 
 
     # Set up Torch ANI
-    device = "cpu"
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     model = torchani.models.ANI2x(periodic_table_index=True).to(device)
 
     # set up tensors for ani boundary conditions
     cell = torch.tensor(box_vects.reshape(3, 3), device=device).float()
     pbc = torch.tensor([True, True, True], device=device)
     
-    # Set the number of timesteps for our simulation
-    nsteps = 10
-
     # iterate
+    energies = []
     for i in range(nsteps):
         # Send MDI to forces node
         mdi.MDI_Send_Command("@FORCES", comm)
@@ -117,13 +129,13 @@ if __name__ == "__main__":
         lammps_energy = mdi.MDI_Recv(1, mdi.MDI_DOUBLE, comm)
 
         # ani wants a torch tensor with shape (natoms, 3)
-        coords_reshape = coords.reshape(natoms, 3)
+        coords_reshape = coords.reshape(1, natoms, 3)
 
         # create a torch tensor for coords
-        coords_torch = torch.tensor([coords_reshape], requires_grad=True, device=device).float()
+        coords_torch = torch.tensor(coords_reshape, requires_grad=True, device=device).float()
         
         # create a torch tensor for elements
-        elements_torch = torch.tensor([elements], device=device)
+        elements_torch = torch.tensor(elements, device=device)
 
         # calculate the forces using ANI
         energy = model((elements_torch, coords_torch), cell=cell, pbc=pbc).energies
@@ -141,6 +153,22 @@ if __name__ == "__main__":
         # Send the forces to the engine
         mdi.MDI_Send_Command(">FORCES", comm)
         mdi.MDI_Send(forces_np, natoms*3, mdi.MDI_DOUBLE, comm)
+
+        # append TorchANI energies
+        energies.append(energy.item())
+
+    # use matplotib to make a plot of energies
+    plt.plot(energies)
+    plt.xlabel("Timestep")
+    plt.ylabel("Energy (Hartree)")
+    
+    # make figure fit on page
+    plt.tight_layout()
+
+    if node == "@INIT_OPTG":
+        plt.savefig("minimization_energies.png")
+    elif node == "@INIT_MD":
+        plt.savefig("md_energies.png")
 
     # Send the "EXIT" command to each of the engines
     mdi.MDI_Send_Command("EXIT", comm)

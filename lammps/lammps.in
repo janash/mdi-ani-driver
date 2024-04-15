@@ -10,9 +10,9 @@ special_bonds   amber
 
 atom_modify	sort 0 0
 
-read_data       lammps.data
+read_data       min.data
 
-timestep        1.0
+timestep        0.1
 
 dump            1 all custom 1 dump.lammpstrj id element xu yu zu
 dump            2 all custom 1 dump.force id element fx fy fz
