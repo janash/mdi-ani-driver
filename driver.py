@@ -52,6 +52,9 @@ if __name__ == "__main__":
     # Initialize the MDI Library
     mdi.MDI_Init(mdi_options)
 
+    # Get conversion factors
+    bohr_to_angstrom = mdi.MDI_Conversion_Factor("bohr","angstrom")
+
     # Get the correct MPI intra-communicator for this code
     mpi_comm_world = mdi.MDI_MPI_get_world_comm()
 
@@ -74,13 +77,6 @@ if __name__ == "__main__":
     natoms = mdi.MDI_Recv(1, mdi.MDI_INT, comm)
     print("Number of atoms: " + str(natoms))
 
-    # Try to get the starting coordinates
-    coords = np.empty(natoms*3, dtype=float) # make a buffer
-    mdi.MDI_Send_Command("<COORDS", comm)
-    mdi.MDI_Recv(natoms*3, mdi.MDI_DOUBLE, comm, coords)
-    coords = coords.reshape(natoms, 3)
-    print(coords.shape)
-
     # We will figure out the atoms based on mass.
     # LAMMPS doesn't store elements.
     masses = np.empty(natoms, dtype=float)
@@ -100,6 +96,7 @@ if __name__ == "__main__":
     box_vects = np.empty(9, dtype=float)
     mdi.MDI_Send_Command("<CELL", comm)
     mdi.MDI_Recv(9, mdi.MDI_DOUBLE, comm, buf=box_vects)
+    box_vects = bohr_to_angstrom * box_vects
     print(box_vects)
 
     # Start appropriate type of simulaton
@@ -112,7 +109,7 @@ if __name__ == "__main__":
     # set up tensors for ani boundary conditions
     cell = torch.tensor(box_vects.reshape(3, 3), device=device).float()
     pbc = torch.tensor([True, True, True], device=device)
-    
+
     # iterate
     energies = []
     for i in range(nsteps):
@@ -123,6 +120,7 @@ if __name__ == "__main__":
         coords = np.empty(3*natoms, dtype=float)
         mdi.MDI_Send_Command("<COORDS", comm)
         mdi.MDI_Recv(3*natoms, mdi.MDI_DOUBLE, comm, buf=coords)
+        coords = bohr_to_angstrom * coords
 
         # Get the energy from LAMMPS
         mdi.MDI_Send_Command("<ENERGY", comm)
@@ -149,6 +147,7 @@ if __name__ == "__main__":
 
         # reshape to be 1-dimensional like MDI wants
         forces_np = forces_np.reshape(natoms*3)
+        forces_np = forces_np / bohr_to_angstrom
 
         # Send the forces to the engine
         mdi.MDI_Send_Command(">FORCES", comm)
