@@ -1,4 +1,5 @@
 import sys
+import warnings
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -7,10 +8,7 @@ import torchani
 
 
 # Import the MDI Library
-try:
-    import mdi
-except:
-    raise Exception("Unable to import the MDI Library")
+import mdi
 
 # Import MPI Library
 try:
@@ -21,33 +19,22 @@ except ImportError:
     use_mpi4py = False
     mpi_comm_world = None
 
+# Import the parser
+from parser import create_parser
 
 if __name__ == "__main__":
 
     # Read the command-line options
-    iarg = 1
-    mdi_options = None
-    nsteps = 10
-    node = "@INIT_MD"
-    while iarg < len(sys.argv):
-        arg = sys.argv[iarg]
+    args = create_parser().parse_args()
 
-        if arg == "-mdi":
-            mdi_options = sys.argv[iarg + 1]
-            iarg += 1
-        elif arg == "-nsteps":
-            nsteps = int(sys.argv[iarg + 1])
-            iarg += 1
-        elif arg == "--minimization":
-            node = "@INIT_OPTG"
-        else:
-            raise Exception("Unrecognized command-line option")
+    mdi_options = args.mdi
+    nsteps = args.nsteps
+    node = "@INIT_MD" if not args.minimization else "@INIT_OPTG"
+    outputfile = args.out
 
-        iarg += 1
-
-    # Confirm that the MDI options were provided
     if mdi_options is None:
-        raise Exception("-mdi command-line option was not provided")
+        mdi_options = "-role DRIVER -name driver -method TCP -port 8021 -hostname localhost"
+        warnings.warn(f"Warning: -mdi not provided. Using default value: {mdi_options}")
 
     # Initialize the MDI Library
     mdi.MDI_Init(mdi_options)
@@ -70,19 +57,16 @@ if __name__ == "__main__":
     # Get the name of the engine
     mdi.MDI_Send_Command("<NAME", comm)
     engine_name = mdi.MDI_Recv(mdi.MDI_NAME_LENGTH, mdi.MDI_CHAR, comm)
-    print("Engine name: " + engine_name)
 
     # Get the number of atoms
     mdi.MDI_Send_Command("<NATOMS", comm)
     natoms = mdi.MDI_Recv(1, mdi.MDI_INT, comm)
-    print("Number of atoms: " + str(natoms))
 
     # We will figure out the atoms based on mass.
     # LAMMPS doesn't store elements.
     masses = np.empty(natoms, dtype=float)
     mdi.MDI_Send_Command("<MASSES", comm)
     mdi.MDI_Recv(natoms, mdi.MDI_DOUBLE, comm, masses)
-    print(masses)
 
     # If we want to be more sophisticated, we would
     # use a mapping of all of the elements to masses.
@@ -91,13 +75,11 @@ if __name__ == "__main__":
     element_map = {15.9994: 8, 1.008: 1}
     elements = np.array([[element_map[mass] for mass in masses]])
     
-
     # Get the box vectors
     box_vects = np.empty(9, dtype=float)
     mdi.MDI_Send_Command("<CELL", comm)
     mdi.MDI_Recv(9, mdi.MDI_DOUBLE, comm, buf=box_vects)
     box_vects = bohr_to_angstrom * box_vects
-    print(box_vects)
 
     # Start appropriate type of simulaton
     mdi.MDI_Send_Command(node, comm) 
@@ -106,11 +88,12 @@ if __name__ == "__main__":
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     model = torchani.models.ANI2x(periodic_table_index=True).to(device)
 
-    # set up tensors for ani boundary conditions
+    # Set up tensors for ANI
     cell = torch.tensor(box_vects.reshape(3, 3), device=device).float()
     pbc = torch.tensor([True, True, True], device=device)
+    elements_torch = torch.tensor(elements, device=device)
 
-    # iterate
+    # Run the simulation - iterate for nsteps
     energies = []
     for i in range(nsteps):
         # Send MDI to forces node
@@ -131,9 +114,6 @@ if __name__ == "__main__":
 
         # create a torch tensor for coords
         coords_torch = torch.tensor(coords_reshape, requires_grad=True, device=device).float()
-        
-        # create a torch tensor for elements
-        elements_torch = torch.tensor(elements, device=device)
 
         # calculate the forces using ANI
         energy = model((elements_torch, coords_torch), cell=cell, pbc=pbc).energies
@@ -156,7 +136,12 @@ if __name__ == "__main__":
         # append TorchANI energies
         energies.append(energy.item())
 
-    # use matplotib to make a plot of energies
+    # write energies
+    with open(outputfile, "w") as f:
+        for energy in energies:
+            f.write(f"{energy}\n")
+
+    # use matplotib to make a plot of energies - will probably remove
     plt.plot(energies)
     plt.xlabel("Timestep")
     plt.ylabel("Energy (Hartree)")

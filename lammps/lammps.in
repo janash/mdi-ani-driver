@@ -12,11 +12,11 @@ atom_modify	sort 0 0
 
 read_data       min.data
 
-timestep        0.1
+timestep        0.5
 
-dump            1 all custom 1 dump.lammpstrj id element xu yu zu
-dump            2 all custom 1 dump.force id element fx fy fz
-dump            3 all xyz 1 dump.xyz
+dump            1 all custom 1 outfiles/dump.lammpstrj id element xu yu zu
+dump            2 all custom 1 outfiles/dump.force id element fx fy fz
+dump            3 all xyz 1 outfiles/dump.xyz
 dump_modify     1 element O H
 dump_modify     2 element O H
 

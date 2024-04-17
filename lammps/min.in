@@ -14,8 +14,8 @@ read_data       lammps.data
 
 min_style cg
 
-dump            1 all custom 1 min.lammpstrj id element xu yu zu
-dump            2 all custom 1 min.force id element fx fy fz
+dump            1 all custom 1 outfiles/min.lammpstrj id element xu yu zu
+dump            2 all custom 1 outfiles/min.force id element fx fy fz
 dump            3 all xyz 1 min.xyz
 dump_modify     1 element O H
 dump_modify     2 element O H
