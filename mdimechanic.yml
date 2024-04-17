@@ -18,25 +18,25 @@ run_scripts:
       ani:
         image: 'mdi-ani-driver:dev'
         script:
-          - python driver.py -mdi "-role DRIVER -name driver -method TCP -port 8021" -nsteps 100
+          - python driver.py -mdi "-role DRIVER -name driver -method TCP -port 8021" -nsteps 100 -out lammps/outfiles/ani_md.out
       lammps:
         image: 'janash/mdi-lammps:slim'
         script:
           - umask 0000
           - cd lammps
-          - lmp_mpi -mdi "-role ENGINE -name MD -method TCP -port 8021 -hostname ani" -in lammps.in > lammps.out
+          - lmp_mpi -mdi "-role ENGINE -name MD -method TCP -port 8021 -hostname ani" -in lammps.in > outfiles/lammps.out
   ani-min:
     containers:
       ani:
         image: 'mdi-ani-driver:dev'
         script:
-          - python driver.py -mdi "-role DRIVER -name driver -method TCP -port 8021" -nsteps 25 --minimization
+          - python driver.py -mdi "-role DRIVER -name driver -method TCP -port 8021" -nsteps 10 -out lammps/outfiles/ani_min.out --minimization
       lammps:
         image: 'janash/mdi-lammps:slim'
         script:
           - umask 0000
           - cd lammps
-          - lmp_mpi -mdi "-role ENGINE -name MD -method TCP -port 8021 -hostname ani" -in min.in > min.out
+          - lmp_mpi -mdi "-role ENGINE -name MD -method TCP -port 8021 -hostname ani" -in min.in > outfiles/min.out
       
 
       
