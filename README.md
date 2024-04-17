@@ -5,9 +5,6 @@ The code uses [TorchANI](https://aiqm.github.io/torchani/index.html) to calculat
 
 Please note that this is a **prototype** and may still have some problems or improvements to be made. It's a very simple implementation based off of the principles of MDI and an [introductory tutorial for TorchANI](https://aiqm.github.io/torchani/examples/energy_force.html) and has yet to be tested and validated.
 
-The example system and protocol currently leads to an unstable simulation. 
-If you have ideas for how to change this, please feel free to open an issue!
-
 To run this code, you should install Docker and MDIMechanic. You can find instructions for installing Docker [here](https://docs.docker.com/get-docker/).
 
 To install MDI Mechanic, make a Python environment, and do:
